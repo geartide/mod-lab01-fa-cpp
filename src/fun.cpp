@@ -3,6 +3,10 @@
 
 #include <locale>
 #include <cctype>
+#include <cwctype>
+#include <cmath>
+#include <cstdlib>
+#include <climits>
 
 unsigned int faStr1(const char *str) {
     unsigned int words = 0;
@@ -151,5 +155,76 @@ unsigned int faStr2(const char *str) {
 }
 
 unsigned int faStr3(const char *str) {
-    return 0;
+    std::wstring wstr;
+    unsigned int words = 0;
+    unsigned int total_letters = 0;
+    enum state_enum {
+        ST_OUTSIDE,
+        ST_WORD
+    } state = ST_OUTSIDE;
+
+    // Перевести const char* в wstring для отображения
+    // корректной длины UTF-8 кириллических слов
+    {
+        const char* old_loc_str = setlocale(0, NULL);
+        setlocale(LC_ALL, "");
+        mbtowc(NULL, NULL, 0);
+        const char *str_ptr = str;
+        wchar_t wc = L'\0';
+        int ret = 0;
+        do {
+            ret = mbtowc(&wc, str_ptr, MB_LEN_MAX);
+            if (ret > 0) {
+                wstr += wc;
+                str_ptr += ret;
+            }
+        } while (ret > 0);
+
+        setlocale(LC_ALL, old_loc_str);
+    }
+
+    for (auto const & c : wstr) {
+        enum char_category {
+            CAT_SPACE,
+            CAT_NONSPACE
+        } category = CAT_NONSPACE;
+
+        if (iswspace(c)) {
+            category = CAT_SPACE;
+        }
+
+        switch (state) {
+            case ST_OUTSIDE:
+                switch (category) {
+                case CAT_NONSPACE:
+                    state = ST_WORD;
+                    words++;
+                    total_letters++;
+                    break;
+                default:
+                    break;
+                }
+                break;
+            case ST_WORD:
+                switch (category) {
+                case CAT_SPACE:
+                    state = ST_OUTSIDE;
+                    break;
+                case CAT_NONSPACE:
+                    total_letters++;
+                    break;
+                default:
+                    break;
+                }
+                break;
+            default:
+                state = ST_OUTSIDE;
+                break;
+        }
+    }
+
+    double average_length =
+                    words ? static_cast<double>(total_letters) / words : 0;
+
+    return std::round(average_length);
 }
